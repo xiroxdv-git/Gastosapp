@@ -1,22 +1,7 @@
 import 'package:flutter/material.dart';
-import 'tecladopantalla.dart'; // Asegúrate de que la ruta sea correcta si está dentro de la misma carpeta
-
-// Modelo sencillo para representar un Gasto
-class GastoItem {
-  final String icon;
-  final String nombre;
-  final String categoria;
-  final double precio;
-  final String hora;
-
-  GastoItem({
-    required this.icon,
-    required this.nombre,
-    required this.categoria,
-    required this.precio,
-    required this.hora,
-  });
-}
+import 'keyboard_screen.dart';
+import '../models/gasto_item.dart';
+import '../services/file_manager.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,240 +11,367 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Lista inicial de gastos
-  final List<GastoItem> _gastos = [
-    GastoItem(
-      icon: '☕',
-      nombre: 'Starbucks',
-      categoria: 'Alimentación',
-      precio: 6.50,
-      hora: '9:15 AM',
-    ),
-    GastoItem(
-      icon: '🚍',
-      nombre: 'Uber',
-      categoria: 'Transporte',
-      precio: 2.75,
-      hora: '11:30 AM',
-    ),
-    GastoItem(
-      icon: '☕',
-      nombre: 'Almuerzo',
-      categoria: 'Alimentación',
-      precio: 8.00,
-      hora: '1:15 PM',
-    ),
+  List<GastoItem> gastos = [];
+  bool cargando = true;
+  final FileManager _fileManager = FileManager();
+
+  final List<Map<String, dynamic>> categoriasInfo = [
+    {'nombre': 'Alimentación', 'icon': Icons.restaurant, 'color': Colors.orange},
+    {'nombre': 'Transporte', 'icon': Icons.directions_car, 'color': Colors.blue},
+    {'nombre': 'Hospedaje', 'icon': Icons.hotel, 'color': Colors.purple},
+    {'nombre': 'Entretenimiento', 'icon': Icons.movie, 'color': Colors.pink},
+    {'nombre': 'Otros', 'icon': Icons.more_horiz, 'color': Colors.grey},
   ];
 
-  // Mapeo auxiliar para convertir índice de categoría a icono y texto
-  final List<Map<String, String>> _categoriasInfo = [
-    {'nombre': 'Alimentación', 'icon': '☕'},
-    {'nombre': 'Transporte', 'icon': '🚍'},
-    {'nombre': 'Hospedaje', 'icon': '🏨'},
-    {'nombre': 'Entretenimiento', 'icon': '🎬'},
-    {'nombre': 'Otros', 'icon': '📦'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _cargarGastosGuardados();
+  }
 
-  // Cálculo del total acumulado
-  double get totalGastos =>
-      _gastos.fold(0.0, (sum, item) => sum + item.precio);
+  Future<void> _cargarGastosGuardados() async {
+    final gastosGuardados = await _fileManager.cargarGastos();
+    setState(() {
+      gastos = gastosGuardados;
+      cargando = false;
+    });
+  }
 
-  // Método para abrir el modal del teclado
-  void _abrirTecladoAgregarGasto() async {
+  // Abrir modal para AGREGAR gasto
+  Future<void> _abrirTecladoGasto() async {
     final resultado = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const FractionallySizedBox(
-        heightFactor: 0.9,
-        child: Tecladopantalla(),
-      ),
+      builder: (context) => const Tecladopantalla(),
     );
 
-    // Verificación de seguridad para evitar errores al destruir el contexto
-    if (!mounted) return;
+    if (resultado != null && resultado['monto'] > 0) {
+      final double monto = resultado['monto'];
+      final int categoriaIndex = resultado['categoria'];
+      final infoCat = categoriasInfo[categoriaIndex];
 
-    // Si el usuario presionó + AGREGAR GASTO y envió datos válidos
-    if (resultado != null &&
-        resultado['monto'] != null &&
-        resultado['monto'] > 0) {
-      final double montoIngresado = resultado['monto'];
-      final int catIndex = resultado['categoria'] ?? 0;
-
-      // Validación para evitar índice fuera de rango
-      final infoCat = (catIndex >= 0 && catIndex < _categoriasInfo.length)
-          ? _categoriasInfo[catIndex]
-          : _categoriasInfo[0];
-
-      // Formatear hora actual (ej. 4:30 PM)
-      final DateTime now = DateTime.now();
-      final String minFormatted = now.minute.toString().padLeft(2, '0');
-      final int hour12 =
-          now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
-      final String amPm = now.hour >= 12 ? 'PM' : 'AM';
-      final String horaActual = '$hour12:$minFormatted $amPm';
+      final nuevoGasto = GastoItem(
+        titulo: infoCat['nombre'],
+        monto: monto,
+        fecha: DateTime.now(),
+        categoria: infoCat['nombre'],
+      );
 
       setState(() {
-        _gastos.insert(
-          0,
-          GastoItem(
-            icon: infoCat['icon']!,
-            nombre: infoCat['nombre']!,
-            categoria: infoCat['nombre']!,
-            precio: montoIngresado,
-            hora: horaActual,
+        gastos.add(nuevoGasto);
+      });
+
+      await _fileManager.guardarGastos(gastos);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gasto de \$${monto.toStringAsFixed(2)} guardado con éxito'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
           ),
         );
-      });
+      }
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: SizedBox(
-        width: MediaQuery.of(context).size.width * 0.8,
-        height: 50,
-        child: FloatingActionButton.extended(
-          onPressed: _abrirTecladoAgregarGasto,
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          elevation: 4.0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8.0),
-          ),
-          label: const Text(
-            '+ AGREGAR GASTO',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16.0,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Tarjeta principal
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24.0),
-                decoration: BoxDecoration(
-                  color: const Color.fromARGB(255, 30, 30, 30),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.grey.withOpacity(0.3),
-                      spreadRadius: 2,
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Total Gastos hoy',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14.0,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8.0),
-                    Text(
-                      '\$${totalGastos.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 32.0,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+  // Abrir modal para EDITAR gasto
+  Future<void> _editarGasto(int indexReal, GastoItem gastoActual) async {
+    final int catIndex = categoriasInfo.indexWhere(
+      (c) => c['nombre'] == gastoActual.categoria,
+    );
 
-              const SizedBox(height: 24),
-
-              const Text(
-                'Gastos del día',
-                style: TextStyle(
-                  color: Colors.black87,
-                  fontSize: 18.0,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Lista dinámica
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 80),
-                  itemCount: _gastos.length,
-                  itemBuilder: (context, index) {
-                    final gasto = _gastos[index];
-                    return GastosCard(
-                      gasto.icon,
-                      nombre: gasto.nombre,
-                      categoria: gasto.categoria,
-                      precio: '\$${gasto.precio.toStringAsFixed(2)}',
-                      hora: gasto.hora,
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
+    final resultado = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Tecladopantalla(
+        montoInicial: gastoActual.monto,
+        categoriaInicial: catIndex != -1 ? catIndex : 0,
       ),
     );
+
+    if (resultado != null && resultado['monto'] > 0) {
+      final double nuevoMonto = resultado['monto'];
+      final int nuevaCatIndex = resultado['categoria'];
+      final infoCat = categoriasInfo[nuevaCatIndex];
+
+      final gastoActualizado = GastoItem(
+        titulo: infoCat['nombre'],
+        monto: nuevoMonto,
+        fecha: gastoActual.fecha,
+        categoria: infoCat['nombre'],
+      );
+
+      setState(() {
+        gastos[indexReal] = gastoActualizado;
+      });
+
+      await _fileManager.guardarGastos(gastos);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gasto actualizado con éxito'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
-}
 
-class GastosCard extends StatelessWidget {
-  final String icon;
-  final String nombre;
-  final String categoria;
-  final String precio;
-  final String hora;
+  // ELIMINAR gasto y ofrecer opción de Deshacer
+  Future<void> _eliminarGasto(int indexReal) async {
+    final gastoEliminado = gastos[indexReal];
 
-  const GastosCard(
-    this.icon, {
-    super.key,
-    required this.nombre,
-    required this.categoria,
-    required this.precio,
-    required this.hora,
-  });
+    setState(() {
+      gastos.removeAt(indexReal);
+    });
+
+    await _fileManager.guardarGastos(gastos);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gasto de \$${gastoEliminado.monto.toStringAsFixed(2)} eliminado'),
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'DESHACER',
+            textColor: Colors.amber,
+            onPressed: () async {
+              setState(() {
+                gastos.insert(indexReal, gastoEliminado);
+              });
+              await _fileManager.guardarGastos(gastos);
+            },
+          ),
+        ),
+      );
+    }
+  }
+
+  // Diálogo de confirmación para el botón de la papelera
+  Future<void> _confirmarBorrado(int indexReal, GastoItem gasto) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Eliminar gasto?'),
+        content: Text('¿Deseas eliminar "${gasto.titulo}" por \$${gasto.monto.toStringAsFixed(2)}?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('CANCELAR'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('ELIMINAR'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar == true) {
+      _eliminarGasto(indexReal);
+    }
+  }
+
+  double get totalGastado {
+    return gastos.fold(0.0, (sum, item) => sum + item.monto);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8.0),
-      child: ListTile(
-        leading: Text(icon, style: const TextStyle(fontSize: 24.0)),
-        title: Text(nombre),
-        subtitle: Text(categoria),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              precio,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            Text(
-              hora,
-              style: const TextStyle(fontSize: 12.0),
-            ),
-          ],
-        ),
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Mis Gastos'),
+        centerTitle: true,
+      ),
+      body: SafeArea(
+        child: cargando
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                children: [
+                  const SizedBox(height: 16),
+
+                  // Tarjeta Resumen Total
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.all(24),
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withOpacity(0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Total Gastado',
+                          style: TextStyle(color: Colors.white70, fontSize: 14),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '\$${totalGastado.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Encabezado del Historial
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Historial',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'Desliza a la izquierda para borrar',
+                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Lista de Gastos con Dismissible
+                  Expanded(
+                    child: gastos.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.receipt_long, size: 64, color: Colors.grey[300]),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No hay gastos registrados',
+                                  style: TextStyle(color: Colors.grey[500], fontSize: 16),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: gastos.length,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                            itemBuilder: (context, index) {
+                              final indexReal = gastos.length - 1 - index;
+                              final gasto = gastos[indexReal];
+                              final catInfo = categoriasInfo.firstWhere(
+                                (c) => c['nombre'] == gasto.categoria,
+                                orElse: () => categoriasInfo.last,
+                              );
+
+                              return Dismissible(
+                                key: ValueKey('${gasto.fecha.microsecondsSinceEpoch}_$indexReal'),
+                                direction: DismissDirection.endToStart,
+                                background: Container(
+                                  alignment: Alignment.centerRight,
+                                  padding: const EdgeInsets.only(right: 20),
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.redAccent,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        'Borrar',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Icon(Icons.delete, color: Colors.white),
+                                    ],
+                                  ),
+                                ),
+                                onDismissed: (direction) {
+                                  _eliminarGasto(indexReal);
+                                },
+                                child: Card(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: ListTile(
+                                    onTap: () => _editarGasto(indexReal, gasto),
+                                    leading: CircleAvatar(
+                                      backgroundColor: (catInfo['color'] as Color).withOpacity(0.15),
+                                      child: Icon(catInfo['icon'] as IconData, color: catInfo['color'] as Color),
+                                    ),
+                                    title: Text(
+                                      gasto.titulo,
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                    subtitle: Text(
+                                      '${gasto.fecha.day}/${gasto.fecha.month}/${gasto.fecha.year}',
+                                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                                    ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          '-\$${gasto.monto.toStringAsFixed(2)}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                            color: Colors.redAccent,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete_outline, size: 20, color: Colors.grey),
+                                          tooltip: 'Eliminar',
+                                          onPressed: () => _confirmarBorrado(indexReal, gasto),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+      ),
+
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _abrirTecladoGasto,
+        backgroundColor: primaryColor,
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text('Nuevo Gasto', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
     );
   }

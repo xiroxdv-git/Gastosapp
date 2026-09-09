@@ -1,25 +1,77 @@
 import 'package:flutter/material.dart';
-import 'Screen/home_screen.dart'; // Verifica que la carpeta en tu proyecto se llame 'Screen' o 'screen'
+import 'package:flutter/services.dart';
+import 'screen/home_screen.dart';
 
 void main() {
-  runApp(const Gastosapp());
+  WidgetsFlutterBinding.ensureInitialized();
+
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ),
+  );
+
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]).then((_) {
+    runApp(const GastosApp());
+  });
 }
 
-class Gastosapp extends StatelessWidget {
-  const Gastosapp({super.key});
+class GastosApp extends StatelessWidget {
+  const GastosApp({super.key});
 
   @override
   Widget build(BuildContext context) {
+    const primaryColor = Color(0xFF6155F5);
+    const backgroundColor = Color(0xFFF8F9FA);
+
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Gastos App',
       theme: ThemeData(
         useMaterial3: true,
-        // Si ya configuraste la fuente Inria Serif en pubspec.yaml, descomenta la línea siguiente:
-        // fontFamily: 'InriaSerif',
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color.fromARGB(255, 97, 85, 245),
-          primary: const Color.fromARGB(255, 97, 85, 245),
+          seedColor: primaryColor,
+          primary: primaryColor,
+          surface: backgroundColor,
+        ),
+        scaffoldBackgroundColor: backgroundColor,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          centerTitle: true,
+          titleTextStyle: TextStyle(
+            color: Colors.black87,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+          iconTheme: IconThemeData(color: Colors.black87),
+        ),
+        // Se utiliza CardThemeData para compatibilidad con las versiones más recientes de Flutter
+        cardTheme: CardThemeData(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          color: Colors.white,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: primaryColor,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+            ),
+            textStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
       ),
       home: const HomeScreen(),

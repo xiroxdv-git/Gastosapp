@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 
 class Tecladopantalla extends StatefulWidget {
-  const Tecladopantalla({super.key});
+  final double? montoInicial;
+  final int? categoriaInicial;
+
+  const Tecladopantalla({
+    super.key,
+    this.montoInicial,
+    this.categoriaInicial,
+  });
 
   @override
   State<Tecladopantalla> createState() => _TecladopantallaState();
@@ -12,9 +19,23 @@ class _TecladopantallaState extends State<Tecladopantalla> {
   int categoriaSeleccionada = 0;
   String monto = '0';
 
+  @override
+  void initState() {
+    super.initState();
+    // Si viene un monto inicial (modo edición), lo cargamos en el estado
+    if (widget.montoInicial != null && widget.montoInicial! > 0) {
+      final m = widget.montoInicial!;
+      monto = (m % 1 == 0) ? m.toInt().toString() : m.toString();
+    }
+    // Si viene una categoría inicial, la seleccionamos
+    if (widget.categoriaInicial != null && widget.categoriaInicial! >= 0) {
+      categoriaSeleccionada = widget.categoriaInicial!;
+    }
+  }
+
   void _onNumeroPresionado(String texto) {
     setState(() {
-      if (texto == '<') {
+      if (texto == 'DEL') {
         if (monto.length > 1) {
           monto = monto.substring(0, monto.length - 1);
         } else {
@@ -48,18 +69,19 @@ class _TecladopantallaState extends State<Tecladopantalla> {
         mainAxisSize: MainAxisSize.min,
         children: [
           CircleAvatar(
-            radius: 22,
+            radius: 24,
             backgroundColor: isSelected ? primaryColor : Colors.grey[200],
             child: Icon(
               icon,
               color: isSelected ? Colors.white : Colors.black54,
+              size: 22,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             label,
             style: TextStyle(
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               color: isSelected ? primaryColor : Colors.black87,
             ),
@@ -69,30 +91,36 @@ class _TecladopantallaState extends State<Tecladopantalla> {
     );
   }
 
-  Widget _buildTecladoRow(List<String> valores) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: valores.map((valor) {
-          return InkWell(
-            onTap: () => _onNumeroPresionado(valor),
-            borderRadius: BorderRadius.circular(30),
-            child: Container(
-              width: 60,
-              height: 60,
-              alignment: Alignment.center,
-              child: Text(
+  Widget _buildTecladoBoton(String valor, {Widget? customWidget}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _onNumeroPresionado(valor),
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 68,
+          height: 68,
+          alignment: Alignment.center,
+          child: customWidget ??
+              Text(
                 valor,
                 style: const TextStyle(
-                  fontSize: 24,
+                  fontSize: 26,
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
                 ),
               ),
-            ),
-          );
-        }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTecladoRow(List<Widget> botones) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: botones,
       ),
     );
   }
@@ -100,31 +128,33 @@ class _TecladopantallaState extends State<Tecladopantalla> {
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
+    final bool esEdicion = widget.montoInicial != null;
 
     return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       child: Scaffold(
+        backgroundColor: Colors.white,
         body: SafeArea(
           child: Column(
             children: [
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
 
-              // Indicador visual de arrastrar modal (Línea gris superior)
+              // Indicador visual superior
               Container(
-                width: 40,
-                height: 4,
+                width: 44,
+                height: 5,
                 decoration: BoxDecoration(
                   color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(2.5),
                 ),
               ),
 
               const SizedBox(height: 16),
-              const Text(
-                'Agregar Gasto',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              Text(
+                esEdicion ? 'Editar Gasto' : 'Agregar Gasto',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               // Cantidad Grande Dinámica
               Row(
@@ -135,25 +165,28 @@ class _TecladopantallaState extends State<Tecladopantalla> {
                   Text(
                     monto,
                     style: const TextStyle(
-                      fontSize: 44,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 46,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black87,
                     ),
                   ),
                   const SizedBox(width: 8),
                   const Text(
                     'USD',
                     style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.black54,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black45,
                     ),
                   ),
                 ],
               ),
+
               const SizedBox(height: 24),
 
               // Categorías Horizontales
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
@@ -172,7 +205,10 @@ class _TecladopantallaState extends State<Tecladopantalla> {
               Expanded(
                 child: Container(
                   width: double.infinity,
-                  color: const Color.fromARGB(255, 245, 245, 245),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF7F7F8),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                  ),
                   child: SingleChildScrollView(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
@@ -181,21 +217,45 @@ class _TecladopantallaState extends State<Tecladopantalla> {
                       ),
                       child: Column(
                         children: [
-                          _buildTecladoRow(['1', '2', '3']),
-                          _buildTecladoRow(['4', '5', '6']),
-                          _buildTecladoRow(['7', '8', '9']),
-                          _buildTecladoRow(['.', '0', '<']),
+                          _buildTecladoRow([
+                            _buildTecladoBoton('1'),
+                            _buildTecladoBoton('2'),
+                            _buildTecladoBoton('3'),
+                          ]),
+                          _buildTecladoRow([
+                            _buildTecladoBoton('4'),
+                            _buildTecladoBoton('5'),
+                            _buildTecladoBoton('6'),
+                          ]),
+                          _buildTecladoRow([
+                            _buildTecladoBoton('7'),
+                            _buildTecladoBoton('8'),
+                            _buildTecladoBoton('9'),
+                          ]),
+                          _buildTecladoRow([
+                            _buildTecladoBoton('.'),
+                            _buildTecladoBoton('0'),
+                            _buildTecladoBoton(
+                              'DEL',
+                              customWidget: const Icon(
+                                Icons.backspace_outlined,
+                                size: 24,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ]),
 
-                          const SizedBox(height: 16.0),
+                          const SizedBox(height: 20.0),
 
-                          // Botón Agregar Gasto
+                          // Botón Confirmar
                           SizedBox(
                             width: double.infinity,
-                            height: 48,
+                            height: 52,
                             child: ElevatedButton(
                               onPressed: () {
+                                final double valorNumerico = double.tryParse(monto) ?? 0.0;
                                 Navigator.pop(context, {
-                                  'monto': double.tryParse(monto) ?? 0.0,
+                                  'monto': valorNumerico,
                                   'categoria': categoriaSeleccionada,
                                 });
                               },
@@ -206,36 +266,34 @@ class _TecladopantallaState extends State<Tecladopantalla> {
                                 ),
                                 elevation: 0,
                               ),
-                              child: const Text(
-                                '+ AGREGAR GASTO',
-                                style: TextStyle(
+                              child: Text(
+                                esEdicion ? 'GUARDAR CAMBIOS' : '+ AGREGAR GASTO',
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16.0,
-                                  fontWeight: FontWeight.w500,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
                           ),
 
-                          const SizedBox(height: 12.0),
+                          const SizedBox(height: 10.0),
 
                           // Botón Cancelar
                           SizedBox(
                             width: double.infinity,
                             height: 48,
-                            child: ElevatedButton(
+                            child: TextButton(
                               onPressed: () => Navigator.pop(context),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey[300],
+                              style: TextButton.styleFrom(
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(28),
                                 ),
-                                elevation: 0,
                               ),
                               child: const Text(
                                 'Cancelar',
                                 style: TextStyle(
-                                  color: Colors.black87,
+                                  color: Colors.black54,
                                   fontSize: 16.0,
                                   fontWeight: FontWeight.w500,
                                 ),
